@@ -24,9 +24,9 @@ class DenseLayer
 public:
 	DenseLayer(double _learning_rate=0.03,bool _is_input_layer=false );
 	void Initializer();
-	Eigen::Matrix<double, 1, Eigen::Dynamic> ForwardPropagation(Eigen::Matrix<double, 1, backunits_len> _x_data);
+	Eigen::Matrix<double, 1, Eigen::Dynamic> ForwardPropagation(Eigen::Matrix<double, 1, backunits_len> &_x_data);
 	Eigen::Matrix<double, units_len, units_len> cal_gradient();
-	Eigen::Matrix<double, 1, backunits_len> BackwardPropagation(Eigen::Matrix<double, 1, units_len>  gradient);
+	Eigen::Matrix<double, 1, backunits_len> BackwardPropagation(Eigen::Matrix<double, 1, units_len>  &gradient);
 private:
 	bool is_input_layer;
 	double learning_rate;
@@ -57,7 +57,7 @@ void DenseLayer<T, backunits_len, units_len>::Initializer()
 }
 
 template<typename T, int backunits_len, int units_len>
-Eigen::Matrix<double, 1, Eigen::Dynamic> DenseLayer<T, backunits_len, units_len>::ForwardPropagation(Eigen::Matrix<double, 1, backunits_len> _x_data)
+Eigen::Matrix<double, 1, Eigen::Dynamic> DenseLayer<T, backunits_len, units_len>::ForwardPropagation(Eigen::Matrix<double, 1, backunits_len> &_x_data)
 {
 	x_data = _x_data;
 	if (is_input_layer==true)
@@ -81,7 +81,7 @@ Eigen::Matrix<double, units_len, units_len> DenseLayer<T, backunits_len, units_l
 }
 
 template<typename T, int backunits_len, int units_len>
-Eigen::Matrix<double, 1, backunits_len> DenseLayer<T, backunits_len, units_len>::BackwardPropagation(Eigen::Matrix<double, 1, units_len> gradient)
+Eigen::Matrix<double, 1, backunits_len> DenseLayer<T, backunits_len, units_len>::BackwardPropagation(Eigen::Matrix<double, 1, units_len> &gradient)
 {
 	//partial loss/ partial wij= 1{wx_plus_b[i]>=0} * xdatai * gradientj
 	Eigen::Matrix<double, units_len, units_len> gradient_activation_weight = cal_gradient();
@@ -109,15 +109,15 @@ class BPNN
 int main()
 {
 	cout << "Hello world!" << endl;
-	DenseLayer<double,3,4> D(0.03,false);
+	DenseLayer<double,3,5> D(0.03,false);
 	D.Initializer();
 	Eigen::Matrix<double, 1, 3> x_data;
 	x_data << 1, 2, 3;
 	cout<<D.ForwardPropagation(x_data)<<endl;
 	cout << D.cal_gradient() << endl;
 
-	Eigen::Matrix<double, 1, 4>  gradient;
-	gradient << 1, 2, 3, 4;
+	Eigen::Matrix<double, 1, 5>  gradient;
+	gradient << 1, 2, 3, 4, 5;
 	cout << D.BackwardPropagation(gradient) << endl;
 	cout << endl;
 
