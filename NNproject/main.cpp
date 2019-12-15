@@ -1,6 +1,10 @@
 #include<iostream>
 #include <Eigen/Dense>
 #include<vector>
+#include<string>
+
+#define stock_rows 465
+#define stock_cols 487
 
 using namespace std;
 
@@ -35,9 +39,9 @@ public:
 	enum Activation { Sigmoid, ReLu };
 	DenseLayer(int _backunits_len, int _units_len, double _learning_rate, bool _is_input_layer, Activation t);
 	void Initializer();
-	Eigen::Matrix<double, 1, Eigen::Dynamic> ForwardPropagation(Eigen::Matrix<double, 1, Eigen::Dynamic> _x_data);
-	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> cal_gradient();
-	Eigen::Matrix<double, 1, Eigen::Dynamic> BackwardPropagation(Eigen::Matrix<double, 1, Eigen::Dynamic>  gradient);
+	Eigen::MatrixXd ForwardPropagation(Eigen::MatrixXd &_x_data);
+	Eigen::MatrixXd cal_gradient();
+	Eigen::MatrixXd BackwardPropagation(Eigen::MatrixXd & gradient);
 	int getbackunits() { return backunits_len; };
 	int getunits() { return units_len; };
 	void setinputlayer() { is_input_layer = true; };
@@ -46,36 +50,39 @@ private:
 	int backunits_len; int units_len;
 	bool is_input_layer;
 	double learning_rate;
-	Eigen::Matrix<double, 1, Eigen::Dynamic> output;
-	Eigen::Matrix<double, 1, Eigen::Dynamic> wx_plus_b;
-	Eigen::Matrix<double, 1, Eigen::Dynamic> bias;
-	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> weight;
-	Eigen::Matrix<double, 1, Eigen::Dynamic> x_data;
-	Eigen::Matrix<double, 1, Eigen::Dynamic> gradient_to_prop;
-	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gradient_weight;
-	Eigen::Matrix<double, 1, Eigen::Dynamic> gradient_b;
+	Eigen::MatrixXd output;
+	Eigen::MatrixXd wx_plus_b;
+	Eigen::MatrixXd bias;
+	Eigen::MatrixXd weight;
+	Eigen::MatrixXd x_data;
+	Eigen::MatrixXd gradient_to_prop;
+	Eigen::MatrixXd gradient_weight;
+	Eigen::MatrixXd gradient_b;
 };
 
 
-DenseLayer::DenseLayer(int _backunits_len, int _units_len, double _learning_rate = 0.03, bool _is_input_layer = false, Activation t = DenseLayer::Sigmoid)
+DenseLayer::DenseLayer(int _backunits_len, int _units_len, double _learning_rate = 0.03, bool _is_input_layer = false, Activation t = DenseLayer::Sigmoid):
+	output(1, _units_len),wx_plus_b(1, _units_len), bias(1, _units_len), weight(_backunits_len, _units_len), x_data(1, _backunits_len), gradient_to_prop(1, _backunits_len),
+	gradient_weight(_backunits_len, _units_len), gradient_b(1, _units_len)
 {
 	is_input_layer = _is_input_layer;
 	learning_rate = _learning_rate;
 	backunits_len = _backunits_len;
 	units_len = _units_len;
 	act_func = t;
+
 	cout << "Construct a layer " << backunits_len << " to " << units_len << "!" << endl;
 }
 
 
 void DenseLayer::Initializer()
 {
-	weight = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>::Random(backunits_len, units_len);
-	bias = Eigen::Matrix<double, 1, Eigen::Dynamic>::Random(1, units_len);
+	weight = Eigen::MatrixXd::Random(backunits_len, units_len);
+	bias = Eigen::MatrixXd::Random(1, units_len);
 	cout << "Initialize a layer " << backunits_len << " to " << units_len << "!" << endl;
 }
 
-Eigen::Matrix<double, 1, Eigen::Dynamic> DenseLayer::ForwardPropagation(Eigen::Matrix<double, 1, Eigen::Dynamic> _x_data)
+Eigen::MatrixXd DenseLayer::ForwardPropagation(Eigen::MatrixXd &_x_data)
 {
 	x_data = _x_data;
 	if (is_input_layer == true)
@@ -94,21 +101,22 @@ Eigen::Matrix<double, 1, Eigen::Dynamic> DenseLayer::ForwardPropagation(Eigen::M
 }
 
 
-Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> DenseLayer::cal_gradient()
+Eigen::MatrixXd DenseLayer::cal_gradient()
 {
 	// Calculate a diagnal matrix to represent 1{wx_plus_b[i]>=0}, return a  units_len * units_len matrix.
+	Eigen::Matrix<double, 1, Eigen::Dynamic> D = wx_plus_b.unaryExpr([](double x) { return Dsigmoid(x); });
 	if (act_func == Activation::Sigmoid)
-		return wx_plus_b.unaryExpr([](double x) { return Dsigmoid(x); }).asDiagonal();
+		return D.asDiagonal();
 	else if (act_func == Activation::ReLu)
 		return wx_plus_b.unaryExpr([](double x) { return Drelu(x); }).asDiagonal();
 
 }
 
 
-Eigen::Matrix<double, 1, Eigen::Dynamic> DenseLayer::BackwardPropagation(Eigen::Matrix<double, 1, Eigen::Dynamic> gradient)
+Eigen::MatrixXd DenseLayer::BackwardPropagation(Eigen::MatrixXd &gradient)
 {
 	//partial loss/ partial wij= 1{wx_plus_b[i]>=0} * xdatai * gradientj
-	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gradient_activation_weight = cal_gradient();
+	Eigen::MatrixXd gradient_activation_weight = cal_gradient();
 	double gradient_activation_b = -1.0;
 
 
@@ -134,11 +142,11 @@ public:
 	void AddLayer(int _backunits_len, int _units_len, double _learning_rate, bool _is_input_layer, DenseLayer::Activation t);
 	void BuildLayer();
 	void Summary();
-	double Train(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>xdata, Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>ydata, int _train_round, double _accuracy);
+	double Train(Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata, int _train_round, double _accuracy);
 private:
 	vector<DenseLayer*> layers;
 	vector<double> train_mse;
-	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>loss_gradient;
+	Eigen::MatrixXd loss_gradient;
 	int train_round;
 	double accuracy;
 };
@@ -184,7 +192,7 @@ void BPNN::Summary()
 	}
 }
 
-double BPNN::Train(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>xdata, Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>ydata, int _train_round, double _accuracy)
+double BPNN::Train(Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata, int _train_round, double _accuracy)
 {
 	train_round = _train_round;
 	accuracy = _accuracy;
@@ -205,8 +213,8 @@ double BPNN::Train(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>xdata, E
 		all_loss = 0;
 		for (int j = 0; j < n; j++)
 		{
-			Eigen::Matrix<double, 1, Eigen::Dynamic>_xdata = xdata.row(j);
-			Eigen::Matrix<double, 1, Eigen::Dynamic>_ydata = ydata.row(j);
+			Eigen::MatrixXd _xdata = xdata.row(j);
+			Eigen::MatrixXd _ydata = ydata.row(j);
 
 			for (auto layer : layers)
 			{
@@ -256,7 +264,7 @@ void test()
 	modelnew.BuildLayer();
 	modelnew.Summary();
 
-	Eigen::Matrix<double, 10, 10> x;
+	Eigen::MatrixXd x(10,10);
 	x << -0.42341286, 0.21779802, -0.54369312, 2.04964989, 1.00671986,
 		0.72770789, 0.2580108, 0.74788435, 1.45180192, 0.86803638,
 		-1.43974545, -1.20253251, -1.24224465, 0.24809309, -0.93821806,
@@ -277,11 +285,16 @@ void test()
 		-0.12080409, -1.38991104, -0.51387999, 0.9472472, 0.28645597,
 		0.10045478, 0.2806141, 0.12326028, 0.5001843, 0.22650803,
 		-0.66142985, -0.50764307, 1.35874742, -0.54401188, 1.11425037;
-	Eigen::Matrix<double, 10, 2> y;
+	Eigen::MatrixXd y(10,2);
 	y << 0.8, 0.4, 0.4, 0.3, 0.34, 0.45, 0.67, 0.32,
 		0.88, 0.67, 0.78, 0.77, 0.55, 0.66, 0.55, 0.43, 0.54, 0.1,
 		0.1, 0.5;
 	modelnew.Train(x, y, 1000, 0.01);
+}
+
+void readdata(string filename, Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata)
+{
+
 }
 
 
@@ -298,18 +311,22 @@ int main()
 	cout << "Hello world!" << endl;
 	DenseLayer D(3, 5, 0.03, false);
 	D.Initializer();
-	Eigen::Matrix<double, 1, 3> x_data;
+	Eigen::MatrixXd x_data(1,3);
 	x_data << 1, 2, 3;
 	cout << D.ForwardPropagation(x_data) << endl;
 	cout << D.cal_gradient() << endl;
 
-	Eigen::Matrix<double, 1, 5>  gradient;
+	Eigen::MatrixXd  gradient(1,5);
 	gradient << 1, 2, 3, 4, 5;
 	cout << D.BackwardPropagation(gradient) << endl;
 	cout << endl;
 
+	Eigen::MatrixXd xdata(stock_rows,stock_cols);
+	Eigen::MatrixXd ydata(stock_rows, 1);
+	readdata("SPXdata.txt", xdata, ydata);
+
 	//test the training process
-	test();
+	//test();
 
 	system("pause");
 	return 0;
