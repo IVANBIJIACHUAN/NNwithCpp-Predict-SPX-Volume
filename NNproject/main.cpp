@@ -21,7 +21,7 @@ double Drelu(double x)
 
 double sigmoid(double x)
 {
-	return 1/(1+exp(-x));
+	return 1 / (1 + exp(-x));
 }
 
 double Dsigmoid(double x)
@@ -32,8 +32,8 @@ double Dsigmoid(double x)
 class DenseLayer
 {
 public:
-	enum Activation{ Sigmoid, ReLu };
-	DenseLayer(int _backunits_len, int _units_len, double _learning_rate,bool _is_input_layer, Activation t);
+	enum Activation { Sigmoid, ReLu };
+	DenseLayer(int _backunits_len, int _units_len, double _learning_rate, bool _is_input_layer, Activation t);
 	void Initializer();
 	Eigen::Matrix<double, 1, Eigen::Dynamic> ForwardPropagation(Eigen::Matrix<double, 1, Eigen::Dynamic> _x_data);
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> cal_gradient();
@@ -48,7 +48,7 @@ private:
 	double learning_rate;
 	Eigen::Matrix<double, 1, Eigen::Dynamic> output;
 	Eigen::Matrix<double, 1, Eigen::Dynamic> wx_plus_b;
-	Eigen::Matrix<double,1, Eigen::Dynamic> bias;
+	Eigen::Matrix<double, 1, Eigen::Dynamic> bias;
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> weight;
 	Eigen::Matrix<double, 1, Eigen::Dynamic> x_data;
 	Eigen::Matrix<double, 1, Eigen::Dynamic> gradient_to_prop;
@@ -57,7 +57,7 @@ private:
 };
 
 
-DenseLayer::DenseLayer(int _backunits_len, int _units_len, double _learning_rate = 0.03, bool _is_input_layer = false, Activation t= DenseLayer::Sigmoid)
+DenseLayer::DenseLayer(int _backunits_len, int _units_len, double _learning_rate = 0.03, bool _is_input_layer = false, Activation t = DenseLayer::Sigmoid)
 {
 	is_input_layer = _is_input_layer;
 	learning_rate = _learning_rate;
@@ -70,7 +70,7 @@ DenseLayer::DenseLayer(int _backunits_len, int _units_len, double _learning_rate
 
 void DenseLayer::Initializer()
 {
-	weight = Eigen::Matrix<double,Eigen::Dynamic, Eigen::Dynamic>::Random(backunits_len, units_len);
+	weight = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>::Random(backunits_len, units_len);
 	bias = Eigen::Matrix<double, 1, Eigen::Dynamic>::Random(1, units_len);
 	cout << "Initialize a layer " << backunits_len << " to " << units_len << "!" << endl;
 }
@@ -78,7 +78,7 @@ void DenseLayer::Initializer()
 Eigen::Matrix<double, 1, Eigen::Dynamic> DenseLayer::ForwardPropagation(Eigen::Matrix<double, 1, Eigen::Dynamic> _x_data)
 {
 	x_data = _x_data;
-	if (is_input_layer==true)
+	if (is_input_layer == true)
 	{
 		return x_data;
 	}
@@ -97,7 +97,7 @@ Eigen::Matrix<double, 1, Eigen::Dynamic> DenseLayer::ForwardPropagation(Eigen::M
 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> DenseLayer::cal_gradient()
 {
 	// Calculate a diagnal matrix to represent 1{wx_plus_b[i]>=0}, return a  units_len * units_len matrix.
-	if(act_func==Activation::Sigmoid)
+	if (act_func == Activation::Sigmoid)
 		return wx_plus_b.unaryExpr([](double x) { return Dsigmoid(x); }).asDiagonal();
 	else if (act_func == Activation::ReLu)
 		return wx_plus_b.unaryExpr([](double x) { return Drelu(x); }).asDiagonal();
@@ -129,7 +129,9 @@ class BPNN
 {
 public:
 	BPNN();
+	~BPNN();
 	void AddLayer(DenseLayer *layer);
+	void AddLayer(int _backunits_len, int _units_len, double _learning_rate, bool _is_input_layer, DenseLayer::Activation t);
 	void BuildLayer();
 	void Summary();
 	double Train(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>xdata, Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>ydata, int _train_round, double _accuracy);
@@ -146,14 +148,26 @@ BPNN::BPNN()
 
 }
 
+BPNN::~BPNN()
+{
+	for (auto layer : layers)
+		delete layer;
+}
+
 void BPNN::AddLayer(DenseLayer *layer)
 {
 	layers.push_back(layer);
 }
 
+void BPNN::AddLayer(int _backunits_len, int _units_len, double _learning_rate = 0.03, bool _is_input_layer = false, DenseLayer::Activation t = DenseLayer::Sigmoid)
+{
+	DenseLayer *layer = new DenseLayer(_backunits_len, _units_len, _learning_rate, _is_input_layer, t);
+	layers.push_back(layer);
+}
+
 void BPNN::BuildLayer()
 {
-	for (int i=0;i<layers.size();i++)
+	for (int i = 0; i<layers.size(); i++)
 	{
 		if (i == 0)
 			layers[i]->setinputlayer();
@@ -165,12 +179,12 @@ void BPNN::Summary()
 {
 	for (int i = 0; i<layers.size(); i++)
 	{
-		cout<<"-------------"<<i<<"th layer-------------"<<endl;
-		cout << "weight shape = " << layers[i]->getbackunits() << "*"<<layers[i]->getunits() << endl;
+		cout << "-------------" << i << "th layer-------------" << endl;
+		cout << "weight shape = " << layers[i]->getbackunits() << "*" << layers[i]->getunits() << endl;
 	}
 }
 
-double BPNN::Train(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>xdata, Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>ydata, int _train_round, double _accuracy )
+double BPNN::Train(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>xdata, Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>ydata, int _train_round, double _accuracy)
 {
 	train_round = _train_round;
 	accuracy = _accuracy;
@@ -213,8 +227,8 @@ double BPNN::Train(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>xdata, E
 		train_mse.push_back(mse);
 		/*if (abs(train_mse[train_mse.size() - 2] - train_mse[train_mse.size() - 1]) < accuracy)
 		{
-			cout << "Satisfy accuracy!" << endl;
-			return mse;
+		cout << "Satisfy accuracy!" << endl;
+		return mse;
 		}*/
 		cout << mse << endl;
 		if (mse < accuracy)
@@ -231,11 +245,11 @@ double BPNN::Train(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>xdata, E
 int main()
 {
 	cout << "Hello world!" << endl;
-	DenseLayer D(3,5,0.03,false);
+	DenseLayer D(3, 5, 0.03, false);
 	D.Initializer();
 	Eigen::Matrix<double, 1, 3> x_data;
 	x_data << 1, 2, 3;
-	cout<<D.ForwardPropagation(x_data)<<endl;
+	cout << D.ForwardPropagation(x_data) << endl;
 	cout << D.cal_gradient() << endl;
 
 	Eigen::Matrix<double, 1, 5>  gradient;
@@ -248,15 +262,11 @@ int main()
 	double learning_rate = 0.3;
 	DenseLayer::Activation act_fun = DenseLayer::Sigmoid;
 	BPNN modelnew;
-	DenseLayer* layer1 = new DenseLayer(10, 10, learning_rate, true, act_fun);
-	DenseLayer* layer2 = new DenseLayer(10, 20, learning_rate, false, act_fun);
-	DenseLayer* layer3 = new DenseLayer(20, 30, learning_rate, false, act_fun);
-	DenseLayer* layer4 = new DenseLayer(30, 2, learning_rate, false, act_fun);
 
-	modelnew.AddLayer(layer1);
-	modelnew.AddLayer(layer2);
-	modelnew.AddLayer(layer3);
-	modelnew.AddLayer(layer4);
+	modelnew.AddLayer(10, 10, learning_rate, true, act_fun);
+	modelnew.AddLayer(10, 20, learning_rate, false, act_fun);
+	modelnew.AddLayer(20, 30, learning_rate, false, act_fun);
+	modelnew.AddLayer(30, 2, learning_rate, false, act_fun);
 	modelnew.BuildLayer();
 	modelnew.Summary();
 
@@ -286,11 +296,6 @@ int main()
 		0.88, 0.67, 0.78, 0.77, 0.55, 0.66, 0.55, 0.43, 0.54, 0.1,
 		0.1, 0.5;
 	modelnew.Train(x, y, 1000, 0.01);
-
-	delete layer1;
-	delete layer2;
-	delete layer3; 
-	delete layer4;
 
 	system("pause");
 	return 0;
