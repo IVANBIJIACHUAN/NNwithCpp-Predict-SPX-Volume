@@ -2,6 +2,7 @@
 #include <Eigen/Dense>
 #include<vector>
 #include<string>
+#include<fstream>
 
 #define stock_rows 465
 #define stock_cols 487
@@ -36,7 +37,7 @@ double Dsigmoid(double x)
 class DenseLayer
 {
 public:
-	enum Activation { Sigmoid, ReLu };
+	enum Activation { Sigmoid, ReLu,Linear };
 	DenseLayer(int _backunits_len, int _units_len, double _learning_rate, bool _is_input_layer, Activation t);
 	void Initializer();
 	Eigen::MatrixXd ForwardPropagation(Eigen::MatrixXd &_x_data);
@@ -96,6 +97,8 @@ Eigen::MatrixXd DenseLayer::ForwardPropagation(Eigen::MatrixXd &_x_data)
 			output = wx_plus_b.unaryExpr([](double x) { return sigmoid(x); });
 		else if (act_func == Activation::ReLu)
 			output = wx_plus_b.unaryExpr([](double x) { return relu(x); });
+		else if (act_func == Activation::Linear)
+			output = wx_plus_b;
 		return output;
 	}
 }
@@ -104,11 +107,14 @@ Eigen::MatrixXd DenseLayer::ForwardPropagation(Eigen::MatrixXd &_x_data)
 Eigen::MatrixXd DenseLayer::cal_gradient()
 {
 	// Calculate a diagnal matrix to represent 1{wx_plus_b[i]>=0}, return a  units_len * units_len matrix.
-	Eigen::Matrix<double, 1, Eigen::Dynamic> D = wx_plus_b.unaryExpr([](double x) { return Dsigmoid(x); });
+	Eigen::Matrix<double, 1, Eigen::Dynamic> D;
 	if (act_func == Activation::Sigmoid)
-		return D.asDiagonal();
+		D = wx_plus_b.unaryExpr([](double x) { return Dsigmoid(x); });
 	else if (act_func == Activation::ReLu)
-		return wx_plus_b.unaryExpr([](double x) { return Drelu(x); }).asDiagonal();
+		D = wx_plus_b.unaryExpr([](double x) { return Drelu(x); });
+	else if (act_func == Activation::Linear)
+		D = wx_plus_b.unaryExpr([](double x) { return 1; });
+	return D.asDiagonal();
 
 }
 
@@ -196,7 +202,6 @@ double BPNN::Train(Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata, int _train_ro
 {
 	train_round = _train_round;
 	accuracy = _accuracy;
-	cout << _accuracy << endl;
 
 	int n = xdata.rows();
 	double loss = 0;
@@ -207,6 +212,23 @@ double BPNN::Train(Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata, int _train_ro
 		cout << "Bad input data!" << endl;
 		return 0;
 	}
+
+	for (int j = 0; j < n; j++)
+	{
+		Eigen::MatrixXd _xdata = xdata.row(j);
+		Eigen::MatrixXd _ydata = ydata.row(j);
+
+		for (auto layer : layers)
+		{
+			_xdata = layer->ForwardPropagation(_xdata);
+		}
+
+		loss_gradient = 2.0 * (_xdata - _ydata);
+		loss = loss_gradient.unaryExpr([](double x) { return x*x / 4.0; }).sum();
+
+		all_loss += loss;
+	}
+	cout << "Initial mse is " << all_loss / n << endl;
 
 	for (int i = 0; i < train_round; i++)
 	{
@@ -294,7 +316,29 @@ void test()
 
 void readdata(string filename, Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata)
 {
+	ifstream infile;
+	infile.open(filename); 
+	assert(infile.is_open());
 
+	string date;
+	double data;
+	for (int i = 0; i < stock_rows; i++)
+	{
+		//infile >> date;
+		//cout << date << endl;
+		for (int j = 0; j < stock_cols; j++)
+		{
+			infile >> data;
+			xdata(i,j)= data;
+		}
+		infile >> data;
+		//cout << data << endl;
+		ydata(i, 0) = data;
+	}
+
+	infile.close();
+
+	cout << "Successfully read the data from " +filename+"!" << endl;
 }
 
 
@@ -308,7 +352,7 @@ int main()
 	//cout << test2.rows() << test2.cols();
 	////cout << test1 - test2;
 
-	cout << "Hello world!" << endl;
+	/*cout << "Hello world!" << endl;
 	DenseLayer D(3, 5, 0.03, false);
 	D.Initializer();
 	Eigen::MatrixXd x_data(1,3);
@@ -319,11 +363,24 @@ int main()
 	Eigen::MatrixXd  gradient(1,5);
 	gradient << 1, 2, 3, 4, 5;
 	cout << D.BackwardPropagation(gradient) << endl;
-	cout << endl;
+	cout << endl;*/
 
 	Eigen::MatrixXd xdata(stock_rows,stock_cols);
 	Eigen::MatrixXd ydata(stock_rows, 1);
-	readdata("SPXdata.txt", xdata, ydata);
+	readdata("SPXdatanorm.txt", xdata, ydata);
+
+	double learning_rate = 0.003;
+	DenseLayer::Activation act_fun = DenseLayer::ReLu;
+	BPNN modelnew;
+
+	modelnew.AddLayer(stock_cols, stock_cols, learning_rate, true, act_fun);
+	modelnew.AddLayer(stock_cols, 50, learning_rate, false, act_fun);
+	modelnew.AddLayer(50, 5, learning_rate, false, act_fun);
+	modelnew.AddLayer(5, 1, learning_rate, false, DenseLayer::Linear);
+	modelnew.BuildLayer();
+	modelnew.Summary();
+
+	modelnew.Train(xdata, ydata, 1000, 1e-10);
 
 	//test the training process
 	//test();
