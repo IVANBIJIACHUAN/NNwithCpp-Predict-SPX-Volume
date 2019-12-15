@@ -32,7 +32,8 @@ double Dsigmoid(double x)
 class DenseLayer
 {
 public:
-	DenseLayer(int _backunits_len, int _units_len, double _learning_rate,bool _is_input_layer);
+	enum Activation{ Sigmoid, ReLu };
+	DenseLayer(int _backunits_len, int _units_len, double _learning_rate,bool _is_input_layer, Activation t);
 	void Initializer();
 	Eigen::Matrix<double, 1, Eigen::Dynamic> ForwardPropagation(Eigen::Matrix<double, 1, Eigen::Dynamic> _x_data);
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> cal_gradient();
@@ -41,6 +42,7 @@ public:
 	int getunits() { return units_len; };
 	void setinputlayer() { is_input_layer = true; };
 private:
+	Activation act_func;
 	int backunits_len; int units_len;
 	bool is_input_layer;
 	double learning_rate;
@@ -55,12 +57,13 @@ private:
 };
 
 
-DenseLayer::DenseLayer(int _backunits_len, int _units_len, double _learning_rate = 0.03, bool _is_input_layer = false)
+DenseLayer::DenseLayer(int _backunits_len, int _units_len, double _learning_rate = 0.03, bool _is_input_layer = false, Activation t= DenseLayer::Sigmoid)
 {
 	is_input_layer = _is_input_layer;
 	learning_rate = _learning_rate;
 	backunits_len = _backunits_len;
 	units_len = _units_len;
+	act_func = t;
 	cout << "Construct a layer " << backunits_len << " to " << units_len << "!" << endl;
 }
 
@@ -82,7 +85,10 @@ Eigen::Matrix<double, 1, Eigen::Dynamic> DenseLayer::ForwardPropagation(Eigen::M
 	else
 	{
 		wx_plus_b = x_data*weight - bias;
-		output = wx_plus_b.unaryExpr([](double x) { return sigmoid(x); });
+		if (act_func == Activation::Sigmoid)
+			output = wx_plus_b.unaryExpr([](double x) { return sigmoid(x); });
+		else if (act_func == Activation::ReLu)
+			output = wx_plus_b.unaryExpr([](double x) { return relu(x); });
 		return output;
 	}
 }
@@ -91,7 +97,10 @@ Eigen::Matrix<double, 1, Eigen::Dynamic> DenseLayer::ForwardPropagation(Eigen::M
 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> DenseLayer::cal_gradient()
 {
 	// Calculate a diagnal matrix to represent 1{wx_plus_b[i]>=0}, return a  units_len * units_len matrix.
-	return wx_plus_b.unaryExpr([](double x) { return Dsigmoid(x); }).asDiagonal();
+	if(act_func==Activation::Sigmoid)
+		return wx_plus_b.unaryExpr([](double x) { return Dsigmoid(x); }).asDiagonal();
+	else if (act_func == Activation::ReLu)
+		return wx_plus_b.unaryExpr([](double x) { return Drelu(x); }).asDiagonal();
 
 }
 
@@ -124,7 +133,6 @@ public:
 	void BuildLayer();
 	void Summary();
 	double Train(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>xdata, Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>ydata, int _train_round, double _accuracy);
-	double cal_loss(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>ydata, Eigen::Matrix<double, Eigen::Dynamic, 1>ydata_);
 private:
 	vector<DenseLayer*> layers;
 	vector<double> train_mse;
@@ -238,11 +246,12 @@ int main()
 	//test the training process
 
 	double learning_rate = 0.3;
+	DenseLayer::Activation act_fun = DenseLayer::Sigmoid;
 	BPNN modelnew;
-	DenseLayer* layer1 = new DenseLayer(10, 10, learning_rate, true);
-	DenseLayer* layer2 = new DenseLayer(10, 20, learning_rate, false);
-	DenseLayer* layer3 = new DenseLayer(20, 30, learning_rate, false);
-	DenseLayer* layer4 = new DenseLayer(30, 2, learning_rate, false);
+	DenseLayer* layer1 = new DenseLayer(10, 10, learning_rate, true, act_fun);
+	DenseLayer* layer2 = new DenseLayer(10, 20, learning_rate, false, act_fun);
+	DenseLayer* layer3 = new DenseLayer(20, 30, learning_rate, false, act_fun);
+	DenseLayer* layer4 = new DenseLayer(30, 2, learning_rate, false, act_fun);
 
 	modelnew.AddLayer(layer1);
 	modelnew.AddLayer(layer2);
