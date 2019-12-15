@@ -1,7 +1,7 @@
 #include<iostream>
 #include <Eigen/Dense>
 #include<vector>
-//test
+
 using namespace std;
 
 double relu(double x)
