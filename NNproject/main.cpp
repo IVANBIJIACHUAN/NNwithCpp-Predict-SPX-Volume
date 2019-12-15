@@ -241,22 +241,8 @@ double BPNN::Train(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>xdata, E
 	return 0;
 }
 
-
-int main()
+void test()
 {
-	cout << "Hello world!" << endl;
-	DenseLayer D(3, 5, 0.03, false);
-	D.Initializer();
-	Eigen::Matrix<double, 1, 3> x_data;
-	x_data << 1, 2, 3;
-	cout << D.ForwardPropagation(x_data) << endl;
-	cout << D.cal_gradient() << endl;
-
-	Eigen::Matrix<double, 1, 5>  gradient;
-	gradient << 1, 2, 3, 4, 5;
-	cout << D.BackwardPropagation(gradient) << endl;
-	cout << endl;
-
 	//test the training process
 
 	double learning_rate = 0.3;
@@ -296,6 +282,34 @@ int main()
 		0.88, 0.67, 0.78, 0.77, 0.55, 0.66, 0.55, 0.43, 0.54, 0.1,
 		0.1, 0.5;
 	modelnew.Train(x, y, 1000, 0.01);
+}
+
+
+int main()
+{
+	//Eigen::Matrix<double, 1,2> test1;
+	//test1 << 1, 2;
+	//Eigen::Matrix<double, 1, Eigen::Dynamic> test2;
+	//test2 << 1, 2;
+	//cout << test1.rows() << test1.cols();
+	//cout << test2.rows() << test2.cols();
+	////cout << test1 - test2;
+
+	cout << "Hello world!" << endl;
+	DenseLayer D(3, 5, 0.03, false);
+	D.Initializer();
+	Eigen::Matrix<double, 1, 3> x_data;
+	x_data << 1, 2, 3;
+	cout << D.ForwardPropagation(x_data) << endl;
+	cout << D.cal_gradient() << endl;
+
+	Eigen::Matrix<double, 1, 5>  gradient;
+	gradient << 1, 2, 3, 4, 5;
+	cout << D.BackwardPropagation(gradient) << endl;
+	cout << endl;
+
+	//test the training process
+	test();
 
 	system("pause");
 	return 0;
