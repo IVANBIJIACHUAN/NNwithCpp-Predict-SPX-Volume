@@ -122,17 +122,15 @@ Eigen::MatrixXd DenseLayer::cal_gradient()
 Eigen::MatrixXd DenseLayer::BackwardPropagation(const Eigen::MatrixXd &gradient)
 {
 	//partial loss/ partial wij= 1{wx_plus_b[i]>=0} * xdatai * gradientj
-	Eigen::MatrixXd gradient_activation_weight = cal_gradient();
-	double gradient_activation_b = -1.0;
+	Eigen::MatrixXd gradient_activation = cal_gradient();
 
-
-	gradient_weight = x_data.transpose()*gradient*gradient_activation_weight; //(backunits,1)*(1,units)*(units,units)
-	gradient_b = gradient*gradient_activation_b; //(backunits,1)*(1,units)*(units,units)
+	gradient_weight = x_data.transpose()*gradient*gradient_activation; //(backunits,1)*(1,units)*(units,units)
+	gradient_b = -gradient*gradient_activation; //(1,units)*(units,units)
 
 	weight = weight - learning_rate*gradient_weight;
 	bias = bias - learning_rate*gradient_b;
 
-	gradient_to_prop = gradient*(weight*gradient_activation_weight).transpose(); //(1,units)*[(backunits,units)*(units,units)].T
+	gradient_to_prop = gradient*(weight*gradient_activation).transpose(); //(1,units)*[(backunits,units)*(units,units)].T
 
 	return gradient_to_prop;
 
@@ -285,8 +283,9 @@ void BPNN::Compare(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 {
 	for (int k = 0; k < num; k++)
 	{
-		cout << "Predict value of sample " << k << " is " << Predict(xdata.row(k), ydata.cols()) << endl;
-		cout << "The real value of sample " << k << " is " << ydata.row(k) << endl;
+		cout << "Predict value of sample " << k << " is " << Predict(xdata.row(k), ydata.cols()) << ". ";
+		cout << "Real value is " << ydata.row(k) << ". ";
+		cout << "Difference is " << Predict(xdata.row(k), ydata.cols()) - ydata.row(k) << ". "<<endl;
 	}
 }
 
@@ -383,8 +382,8 @@ void real_train()
 	Eigen::MatrixXd ydata(stock_rows, 1);
 	readdata("SPXdatanorm.txt", xdata, ydata);
 
-	double learning_rate = 0.03;
-	DenseLayer::Activation act_fun = DenseLayer::Sigmoid;
+	double learning_rate = 0.00003;
+	DenseLayer::Activation act_fun = DenseLayer::ReLu;
 	BPNN modelnew;
 
 	modelnew.AddLayer(stock_cols, stock_cols, learning_rate, true, act_fun);
