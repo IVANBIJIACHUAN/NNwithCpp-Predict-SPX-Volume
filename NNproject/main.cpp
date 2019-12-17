@@ -382,8 +382,8 @@ void real_train()
 	Eigen::MatrixXd ydata(stock_rows, 1);
 	readdata("SPXdatanorm.txt", xdata, ydata);
 
-	double learning_rate = 0.00003;
-	DenseLayer::Activation act_fun = DenseLayer::ReLu;
+	double learning_rate = 0.003;
+	DenseLayer::Activation act_fun = DenseLayer::Sigmoid;
 	BPNN modelnew;
 
 	modelnew.AddLayer(stock_cols, stock_cols, learning_rate, true, act_fun);
@@ -393,7 +393,7 @@ void real_train()
 	modelnew.BuildLayer();
 	modelnew.Summary();
 
-	modelnew.Train(xdata, ydata, 1000, 1e-10);
+	modelnew.Train(xdata, ydata, 100000, 1e-10);
 }
 
 int main()
