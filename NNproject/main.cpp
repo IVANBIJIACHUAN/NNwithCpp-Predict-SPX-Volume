@@ -40,6 +40,7 @@ class DenseLayer
 {
 public:
 	enum Activation { Sigmoid, ReLu, None };
+	enum Optimizer {GD, CGD};//Ludi Wang
 	DenseLayer(int _backunits_len, int _units_len, double _learning_rate, bool _is_input_layer, Activation t);
 	void Initializer();
 	Eigen::MatrixXd ForwardPropagation(const Eigen::MatrixXd &_x_data);
@@ -49,6 +50,7 @@ public:
 	int getunits() { return units_len; };
 	void setinputlayer() { is_input_layer = true; };
 private:
+	Optimizer o;
 	Activation act_func;
 	int backunits_len; int units_len;
 	bool is_input_layer;
@@ -139,6 +141,11 @@ Eigen::MatrixXd DenseLayer::BackwardPropagation(const Eigen::MatrixXd &gradient)
 	gradient_weight = x_data.transpose()*gradient*gradient_activation; //(backunits,1)*(1,units)*(units,units)
 	gradient_b = -gradient*gradient_activation; //(1,units)*(units,units)
 
+	//if(o==Optimizer::GD)
+	//{
+
+	//}
+
 	weight = weight - learning_rate*gradient_weight;
 	bias = bias - learning_rate*gradient_b;
 
@@ -162,6 +169,7 @@ public:
 	Eigen::MatrixXd Predict(const Eigen::MatrixXd& xdata, int output_len);
 	void Compare(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, int num);
 	double Cal_loss(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata);
+	// Add scalor
 private:
 	vector<DenseLayer*> layers;
 	vector<double> train_mse;
@@ -434,3 +442,28 @@ int main()
 	system("pause");
 	return 0;
 }
+
+//main problem
+//1. Gradient Exploding
+// pretraining, cutting
+//2. don't work, structrue is bad
+// no solution
+// yanerdaoling
+
+// Scaling
+// Yiyao Chen
+// add scalor
+// change Predict
+
+// momentum
+// Ludi Wang
+
+// IOinfrastructure
+// save load
+// override: weights, valid result (validation result)
+// append: learning curve
+// model("name")
+// "modelname_activation_layeri.txt"
+// load
+
+
