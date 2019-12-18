@@ -264,7 +264,7 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 			}
 		}
 
-		double mse = all_loss / n;
+		double mse = all_loss / xdatatrain.rows();
 		train_mse.push_back(mse);
 		/*if (abs(train_mse[train_mse.size() - 2] - train_mse[train_mse.size() - 1]) < accuracy)
 		{
@@ -301,14 +301,7 @@ double BPNN::Cal_loss(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata
 	Eigen::MatrixXd _xdata(1, xdata.cols());
 	for (int j = 0; j < xdata.rows(); j++)
 	{
-		_xdata = xdata.row(j);
-
-		for (auto layer : layers)
-		{
-			_xdata = layer->ForwardPropagation(_xdata);
-		}
-
-		all_loss += (_xdata - ydata.row(j)).unaryExpr([](double x) { return x*x; }).sum();
+		all_loss += (Predict(xdata.row(j), ydata.cols()) - ydata.row(j)).unaryExpr([](double x) { return x*x; }).sum();
 	}
 	return all_loss / xdata.rows();
 }
@@ -414,7 +407,7 @@ void real_train()
 {
 	Eigen::MatrixXd xdata(stock_rows, stock_cols);
 	Eigen::MatrixXd ydata(stock_rows, 1);
-	readdata("SPXdatanorm.txt", xdata, ydata);
+	readdata("SPXdatanormshuffle.txt", xdata, ydata);
 
 	double learning_rate = 0.003;
 	DenseLayer::Activation act_fun = DenseLayer::Sigmoid;
@@ -427,7 +420,7 @@ void real_train()
 	modelnew.BuildLayer();
 	modelnew.Summary();
 
-	modelnew.Train(xdata, ydata, 100000, 1e-10, 200);
+	modelnew.Train(xdata, ydata, 100000, 1e-10, 30);
 }
 
 int main()
