@@ -376,6 +376,29 @@ void readdata(string filename, Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata)
 	cout << "Successfully read the data from " +filename+"!" << endl;
 }
 
+//main problem
+//1. Gradient Exploding
+// pretraining, cutting
+//2. don't work, structrue is bad
+// no solution
+// yanerdaoling
+
+// Scaling
+// Yiyao Chen
+// add scalor
+// change Predict
+
+// momentum
+// Ludi Wang
+
+// IOinfrastructure
+// save load
+// override: weights, valid result (validation result)
+// append: learning curve
+// model("name")
+// "modelname_activation_layeri.txt"
+// load
+
 void real_train()
 {
 	Eigen::MatrixXd xdata(stock_rows, stock_cols);
