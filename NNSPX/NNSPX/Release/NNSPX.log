@@ -1,0 +1,11 @@
+﻿  main.cpp
+d:\master\term1\application programming\last pj\nnspx\nnspx\main.cpp(96): warning C4244: “初始化”: 从“std::chrono::system_clock::rep”转换到“unsigned int”，可能丢失数据
+d:\master\term1\application programming\last pj\nnspx\nnspx\main.cpp(216): warning C4018: “<”: 有符号/无符号不匹配
+d:\master\term1\application programming\last pj\nnspx\nnspx\main.cpp(226): warning C4018: “<”: 有符号/无符号不匹配
+d:\master\term1\application programming\last pj\nnspx\nnspx\main.cpp(289): warning C4018: “<”: 有符号/无符号不匹配
+  正在生成代码
+  1 of 2380 functions (<0.1%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    2 functions had inline decision re-evaluated but remain unchanged
+  已完成代码的生成
+  NNSPX.vcxproj -> D:\master\term1\application programming\last pj\NNSPX\Release\NNSPX.exe

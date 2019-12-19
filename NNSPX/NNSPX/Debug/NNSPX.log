@@ -1,0 +1,6 @@
+﻿  main.cpp
+d:\master\term1\application programming\last pj\nnspx\nnspx\main.cpp(96): warning C4244: “初始化”: 从“std::chrono::system_clock::rep”转换到“unsigned int”，可能丢失数据
+d:\master\term1\application programming\last pj\nnspx\nnspx\main.cpp(216): warning C4018: “<”: 有符号/无符号不匹配
+d:\master\term1\application programming\last pj\nnspx\nnspx\main.cpp(226): warning C4018: “<”: 有符号/无符号不匹配
+d:\master\term1\application programming\last pj\nnspx\nnspx\main.cpp(285): warning C4018: “<”: 有符号/无符号不匹配
+  NNSPX.vcxproj -> D:\master\term1\application programming\last pj\NNSPX\Debug\NNSPX.exe
