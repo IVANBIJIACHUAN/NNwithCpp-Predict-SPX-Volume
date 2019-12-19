@@ -8,7 +8,6 @@
 
 #define stock_rows 465
 #define stock_cols 487
-#define stock_cols_use 300
 
 using namespace std;
 
@@ -111,7 +110,7 @@ Eigen::MatrixXd DenseLayer::ForwardPropagation(const Eigen::MatrixXd &_x_data)
 		if (act_func == Activation::Sigmoid)
 			output = wx_plus_b.unaryExpr([](double x) { return sigmoid(x); });
 		else if (act_func == Activation::ReLu)
-			output = wx_plus_b.unaryExpr([](double x) { return relu(x); });//relu(x)>6?6:relu(x)
+			output = wx_plus_b.unaryExpr([](double x) { return relu(x); });
 		else if (act_func == Activation::None)
 			output = wx_plus_b;
 		return output;
@@ -162,6 +161,7 @@ class BPNN
 public:
 	BPNN();
 	~BPNN();
+	enum preprocess { PCA, None };
 	void AddLayer(DenseLayer *layer);
 	void AddLayer(int _backunits_len, int _units_len, double _learning_rate, bool _is_input_layer, DenseLayer::Activation t);
 	void BuildLayer();
@@ -170,6 +170,9 @@ public:
 	Eigen::MatrixXd Predict(const Eigen::MatrixXd& xdata, int output_len);
 	void Compare(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, int num);
 	double Cal_loss(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata);
+	Eigen::MatrixXd Pca(Eigen::MatrixXd& xdata, double threshold, int Redim);
+	Eigen::MatrixXd PcaXdata(Eigen::MatrixXd& xdata, Eigen::MatrixXd& trans, preprocess _p);
+	
 	// Add scalor
 private:
 	vector<DenseLayer*> layers;
@@ -178,6 +181,8 @@ private:
 	Eigen::MatrixXd loss_gradient;
 	int train_round;
 	double accuracy;
+	preprocess p;
+
 };
 
 BPNN::BPNN()
@@ -342,48 +347,55 @@ Eigen::MatrixXd BPNN::Predict(const Eigen::MatrixXd& xdata, int output_len)
 	return ydata;
 }
 
-//void test()
-//{
-//	//test the training process
-//
-//	double learning_rate = 0.03;
-//	DenseLayer::Activation act_fun = DenseLayer::Sigmoid;
-//	BPNN modelnew;
-//
-//	modelnew.AddLayer(10, 10, learning_rate, true, act_fun);
-//	modelnew.AddLayer(10, 20, learning_rate, false, act_fun);
-//	modelnew.AddLayer(20, 30, learning_rate, false, act_fun);
-//	modelnew.AddLayer(30, 2, learning_rate, false, DenseLayer::None);
-//	modelnew.BuildLayer();
-//	modelnew.Summary();
-//
-//	Eigen::MatrixXd x(10,10);
-//	x << -0.42341286, 0.21779802, -0.54369312, 2.04964989, 1.00671986,
-//		0.72770789, 0.2580108, 0.74788435, 1.45180192, 0.86803638,
-//		-1.43974545, -1.20253251, -1.24224465, 0.24809309, -0.93821806,
-//		1.29316884, -0.50198725, -0.63714213, 0.12479802, 0.91007394,
-//		-0.78658784, -1.12794307, -0.77812005, 1.29574899, 0.16750844,
-//		-0.70761621, 1.51739084, -1.19870489, -1.53029875, -0.9038248,
-//		-0.9756778, 0.66175796, 0.26833978, 1.75458108, 0.15402258,
-//		-0.42806397, -0.63166847, 0.19717951, -1.97259133, 0.23806793,
-//		0.83755467, -0.37247964, -0.06758306, 0.22669441, -0.1273009,
-//		1.47156685, 0.30417944, 1.66046617, 1.0805952, 1.02822416,
-//		-1.30650562, 0.66428356, -1.51496519, 0.30665193, -0.95840903,
-//		0.69387956, 0.54239419, -0.13788214, 1.14797255, -1.18778428,
-//		0.92176127, -0.37185503, -0.51249125, -1.52096541, 0.392217,
-//		-1.26853408, -0.23724684, 0.72507058, 0.0810218, 1.20581851,
-//		0.55981882, -1.77590695, -1.12788518, -0.02926117, 0.31905083,
-//		1.11389359, -0.56559586, 0.10578212, -1.30172802, 1.84858769,
-//		-0.2738502, -1.44412151, 0.7872747, -0.10611829, 1.06023464,
-//		-0.12080409, -1.38991104, -0.51387999, 0.9472472, 0.28645597,
-//		0.10045478, 0.2806141, 0.12326028, 0.5001843, 0.22650803,
-//		-0.66142985, -0.50764307, 1.35874742, -0.54401188, 1.11425037;
-//	Eigen::MatrixXd y(10,2);
-//	y << 0.8, 0.4, 0.4, 0.3, 0.34, 0.45, 0.67, 0.32,
-//		0.88, 0.67, 0.78, 0.77, 0.55, 0.66, 0.55, 0.43, 0.54, 0.1,
-//		0.1, 0.5;
-//	modelnew.Train(x, y, 1000, 0.01);
-//}
+Eigen::MatrixXd BPNN::Pca(Eigen::MatrixXd& xdata, double threshold, int Redim = 0)
+{
+	// featuring
+	Eigen::MatrixXd meanval = xdata.colwise().mean();
+	Eigen::RowVectorXd meanvecRow = meanval;
+	Eigen::MatrixXd _xdata = xdata;
+	_xdata.rowwise() -= meanvecRow;
+	_xdata.transpose();
+	
+	// compute covariance matrix
+	Eigen::MatrixXd C = (_xdata.adjoint()*_xdata )/_xdata.rows();
+	
+	// compute eigenvalues
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(C);
+	Eigen::MatrixXd vec = eig.eigenvectors();
+	Eigen::MatrixXd val = eig.eigenvalues();
+		
+	// compute dim
+	int dim;
+	double sum = 0;
+	int k;
+	for (int i = val.rows() - 1; i >= 0; --i) 
+	{
+		sum += val(i, 0);		
+		dim = i;		
+		if (sum / val.sum() >= threshold)
+		{
+			break;	
+		}	
+	k = val.rows() - dim;
+	}
+	
+	// transform matrix
+	Eigen::MatrixXd trans = vec.rightCols(k);
+	if (Redim > 0)
+	{
+		trans = vec.rightCols(Redim);
+	}
+	return trans;
+}
+
+Eigen::MatrixXd BPNN::PcaXdata(Eigen::MatrixXd& xdata, Eigen::MatrixXd& trans, preprocess _p = preprocess::PCA)
+{
+	if (_p == preprocess::PCA)
+	{
+		return xdata * trans;
+	}
+	return xdata;
+}
 
 void readdata(string filename, Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata)
 {
@@ -412,6 +424,55 @@ void readdata(string filename, Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata)
 	cout << "Successfully read the data from " +filename+"!" << endl;
 }
 
+void real_train()
+{
+	Eigen::MatrixXd xdata(stock_rows, stock_cols);
+	Eigen::MatrixXd ydata(stock_rows, 1);
+	readdata("SPXdatanormshuffle.txt", xdata, ydata);
+	double learning_rate = 0.0003;
+	DenseLayer::Activation act_fun = DenseLayer::ReLu;
+	BPNN modelnew;
+
+	int pcanum = 300;
+	Eigen::MatrixXd xdatapca(stock_rows, pcanum);
+	Eigen::MatrixXd trans = modelnew.Pca(xdata, 0.99, pcanum);
+	xdatapca = xdata*trans;
+
+	modelnew.AddLayer(xdatapca.cols(), xdatapca.cols(), learning_rate, true, act_fun);
+	modelnew.AddLayer(xdatapca.cols(), 50, learning_rate, false, act_fun);
+	modelnew.AddLayer(50, 5, learning_rate, false, act_fun);
+	modelnew.AddLayer(5, 1, learning_rate, false, DenseLayer::None);
+	modelnew.BuildLayer();
+	modelnew.Summary();
+
+	modelnew.Train(xdatapca, ydata, 100000, 1e-10, 30);
+	//modelnew.Train(xdata, ydata, 100000, 1e-10, trans, 30);
+}
+
+void testPca()
+{
+	Eigen::MatrixXd xdata(stock_rows, stock_cols);
+	Eigen::MatrixXd ydata(stock_rows, 1);
+	readdata("SPXdatanorm.txt", xdata, ydata);
+	BPNN modelnew;
+	Eigen::MatrixXd trans = modelnew.Pca(xdata, 0.99);
+	Eigen::MatrixXd res = xdata * trans;
+	cout << res.rows() << res.cols()<< endl;
+
+}
+
+int main()
+{
+	
+	
+	//train on real data
+	real_train();
+
+	//testPca();
+	system("pause");
+	return 0;
+}
+
 //main problem
 //1. Gradient Exploding
 // pretraining, cutting
@@ -435,37 +496,4 @@ void readdata(string filename, Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata)
 // "modelname_activation_layeri.txt"
 // load
 
-void real_train()
-{
-	Eigen::MatrixXd xdata(stock_rows, stock_cols);
-	Eigen::MatrixXd ydata(stock_rows, 1);
-	readdata("SPXdatanormshuffle.txt", xdata, ydata);
 
-	Eigen::MatrixXd xdata_reduce(stock_rows, stock_cols_use);
-	xdata_reduce = xdata.block(0, 0, xdata.rows(), stock_cols_use);
-
-	double learning_rate = 0.0003;
-	DenseLayer::Activation act_fun = DenseLayer::ReLu;
-	BPNN modelnew;
-
-	modelnew.AddLayer(stock_cols_use, stock_cols_use, learning_rate, true, act_fun);
-	modelnew.AddLayer(stock_cols_use, 50, learning_rate, false, act_fun);
-	modelnew.AddLayer(50, 5, learning_rate, false, act_fun);
-	modelnew.AddLayer(5, 1, learning_rate, false, DenseLayer::None);
-	modelnew.BuildLayer();
-	modelnew.Summary();
-
-	modelnew.Train(xdata_reduce, ydata, 10000, 1e-5, 30);
-}
-
-int main()
-{
-	//train on real data
-	real_train();
-
-	//test the training process
-	//test();
-
-	system("pause");
-	return 0;
-}

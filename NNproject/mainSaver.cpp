@@ -1,16 +1,20 @@
-#include<iostream>
-#include<Eigen/Dense>
-#include<vector>
-#include<string>
-#include<fstream>
+#include <iostream>
+#include <Eigen/Dense>
+#include <vector>
+#include <string>
+#include <fstream>
 #include <random>
 #include <chrono>
+#include <map>
+#include <tuple>
 
 #define stock_rows 465
 #define stock_cols 487
-#define stock_cols_use 300
+#define stock_cols_use 487
 
 using namespace std;
+
+struct result { double mse; Eigen::MatrixXd pred; };
 
 double relu(double x)
 {
@@ -41,14 +45,17 @@ class DenseLayer
 {
 public:
 	enum Activation { Sigmoid, ReLu, None };
-	enum Optimizer {GD, CGD};//Ludi Wang
-	DenseLayer(int _backunits_len, int _units_len, double _learning_rate, bool _is_input_layer, Activation t);
+	enum Optimizer { GD, CGD };//Ludi Wang
+	DenseLayer(int _backunits_len, int _units_len, string name, double _learning_rate, bool _is_input_layer, Activation t);
 	void Initializer();
 	Eigen::MatrixXd ForwardPropagation(const Eigen::MatrixXd &_x_data);
 	Eigen::MatrixXd cal_gradient();
 	Eigen::MatrixXd BackwardPropagation(const Eigen::MatrixXd & gradient);
 	int getbackunits() { return backunits_len; };
 	int getunits() { return units_len; };
+	Eigen::MatrixXd getweights() { return weight; }
+	Eigen::MatrixXd getbias() { return bias; }
+	string getname() { return layer_name; }
 	void setinputlayer() { is_input_layer = true; };
 private:
 	Optimizer o;
@@ -56,6 +63,7 @@ private:
 	int backunits_len; int units_len;
 	bool is_input_layer;
 	double learning_rate;
+	string layer_name;
 	Eigen::MatrixXd output;
 	Eigen::MatrixXd wx_plus_b;
 	Eigen::MatrixXd bias;
@@ -67,9 +75,9 @@ private:
 };
 
 
-DenseLayer::DenseLayer(int _backunits_len, int _units_len, double _learning_rate = 0.03, bool _is_input_layer = false, Activation t = DenseLayer::Sigmoid):
-	output(1, _units_len),wx_plus_b(1, _units_len), bias(1, _units_len), weight(_backunits_len, _units_len), x_data(1, _backunits_len), gradient_to_prop(1, _backunits_len),
-	gradient_weight(_backunits_len, _units_len), gradient_b(1, _units_len)
+DenseLayer::DenseLayer(int _backunits_len, int _units_len, string name, double _learning_rate = 0.03, bool _is_input_layer = false, Activation t = DenseLayer::Sigmoid) :
+	output(1, _units_len), wx_plus_b(1, _units_len), bias(1, _units_len), weight(_backunits_len, _units_len), x_data(1, _backunits_len), gradient_to_prop(1, _backunits_len),
+	gradient_weight(_backunits_len, _units_len), gradient_b(1, _units_len), layer_name(name)
 {
 	is_input_layer = _is_input_layer;
 	learning_rate = _learning_rate;
@@ -88,7 +96,7 @@ void DenseLayer::Initializer()
 
 	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 	std::default_random_engine gen;
-	std::normal_distribution<double> dis(0, 0.1);
+	std::normal_distribution<double> dis(0, 1);
 	for (int i = 0; i < backunits_len; i++)
 		for (int j = 0; j < units_len; j++)
 			weight(i, j) = dis(gen);
@@ -107,11 +115,11 @@ Eigen::MatrixXd DenseLayer::ForwardPropagation(const Eigen::MatrixXd &_x_data)
 	}
 	else
 	{
-		wx_plus_b = x_data*weight - bias;
+		wx_plus_b = x_data * weight - bias;
 		if (act_func == Activation::Sigmoid)
 			output = wx_plus_b.unaryExpr([](double x) { return sigmoid(x); });
 		else if (act_func == Activation::ReLu)
-			output = wx_plus_b.unaryExpr([](double x) { return relu(x); });//relu(x)>6?6:relu(x)
+			output = wx_plus_b.unaryExpr([](double x) { return relu(x); });
 		else if (act_func == Activation::None)
 			output = wx_plus_b;
 		return output;
@@ -140,17 +148,12 @@ Eigen::MatrixXd DenseLayer::BackwardPropagation(const Eigen::MatrixXd &gradient)
 	Eigen::MatrixXd gradient_activation = cal_gradient();
 
 	gradient_weight = x_data.transpose()*gradient*gradient_activation; //(backunits,1)*(1,units)*(units,units)
-	gradient_b = -gradient*gradient_activation; //(1,units)*(units,units)
+	gradient_b = -gradient * gradient_activation; //(1,units)*(units,units)
 
-	//if(o==Optimizer::GD)
-	//{
+	weight = weight - learning_rate * gradient_weight;
+	bias = bias - learning_rate * gradient_b;
 
-	//}
-
-	weight = weight - learning_rate*gradient_weight;
-	bias = bias - learning_rate*gradient_b;
-
-	gradient_to_prop = gradient*(weight*gradient_activation).transpose(); //(1,units)*[(backunits,units)*(units,units)].T
+	gradient_to_prop = gradient * (weight*gradient_activation).transpose(); //(1,units)*[(backunits,units)*(units,units)].T
 
 	return gradient_to_prop;
 
@@ -163,14 +166,16 @@ public:
 	BPNN();
 	~BPNN();
 	void AddLayer(DenseLayer *layer);
-	void AddLayer(int _backunits_len, int _units_len, double _learning_rate, bool _is_input_layer, DenseLayer::Activation t);
+	void AddLayer(int _backunits_len, int _units_len, string name, double _learning_rate, bool _is_input_layer, DenseLayer::Activation t);
 	void BuildLayer();
 	void Summary();
 	double Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, int _train_round, double _accuracy, int validnum);
 	Eigen::MatrixXd Predict(const Eigen::MatrixXd& xdata, int output_len);
 	void Compare(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, int num);
-	double Cal_loss(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata);
+	result Cal_loss(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata);
 	// Add scalor
+
+
 private:
 	vector<DenseLayer*> layers;
 	vector<double> train_mse;
@@ -196,9 +201,9 @@ void BPNN::AddLayer(DenseLayer *layer)
 	layers.push_back(layer);
 }
 
-void BPNN::AddLayer(int _backunits_len, int _units_len, double _learning_rate = 0.03, bool _is_input_layer = false, DenseLayer::Activation t = DenseLayer::Sigmoid)
+void BPNN::AddLayer(int _backunits_len, int _units_len, string name, double _learning_rate = 0.03, bool _is_input_layer = false, DenseLayer::Activation t = DenseLayer::Sigmoid)
 {
-	DenseLayer *layer = new DenseLayer(_backunits_len, _units_len, _learning_rate, _is_input_layer, t);
+	DenseLayer *layer = new DenseLayer(_backunits_len, _units_len, name, _learning_rate, _is_input_layer, t);
 	layers.push_back(layer);
 }
 
@@ -225,6 +230,10 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 {
 	train_round = _train_round;
 	accuracy = _accuracy;
+	map<string, Eigen::MatrixXd> weight_log;
+	map<string, Eigen::MatrixXd> bias_log;
+	map<string, vector<double>> mse_log;
+	double to_return = 0;
 
 	int n = xdata.rows();
 	double loss = 0;
@@ -243,13 +252,17 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 	Eigen::MatrixXd xdatavalid = xdata.block(xdata.rows() - validnum, 0, validnum, xdata.cols());
 	Eigen::MatrixXd ydatavalid = ydata.block(ydata.rows() - validnum, 0, validnum, ydata.cols());
 
-	cout << "Initial mse on training set is " << Cal_loss(xdatatrain, ydatatrain) << endl;
+	cout << "Initial mse on training set is " << Cal_loss(xdatatrain, ydatatrain).mse << endl;
 	Compare(xdatatrain, ydatatrain, 3);
 
-	cout << "Initial mse on validation set is " << Cal_loss(xdatavalid, ydatavalid) << endl;
+	cout << "Initial mse on validation set is " << Cal_loss(xdatavalid, ydatavalid).mse << endl;
 	Compare(xdatavalid, ydatavalid, 3);
 
-	for (int i = 0; i < train_round; i++)
+	ofstream train_mse_file, valid_mse_file;
+	train_mse_file.open("train_mse.txt", ios::app);
+	valid_mse_file.open("valid_mse.txt", ios::app);
+
+	for (int i=0; i < train_round; i++)
 	{
 		all_loss = 0;
 		for (int j = 0; j < xdatatrain.rows(); j++)
@@ -263,9 +276,10 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 			}
 
 			loss_gradient = 2.0 * (_xdata - _ydata);
-			loss = loss_gradient.unaryExpr([](double x) { return x*x / 4.0; }).sum();
+			loss = loss_gradient.unaryExpr([](double x) { return x * x / 4.0; }).sum();
 
 			all_loss += loss;
+
 
 			for (int k = 0; k < layers.size() - 1; k++)
 			{
@@ -275,16 +289,47 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 
 		double mse = all_loss / xdatatrain.rows();
 		train_mse.push_back(mse);
-		/*if (abs(train_mse[train_mse.size() - 2] - train_mse[train_mse.size() - 1]) < accuracy)
-		{
-		cout << "Satisfy accuracy!" << endl;
-		return mse;
-		}*/
-		double mse_valid = Cal_loss(xdatavalid, ydatavalid);
+
+		result valid_res = Cal_loss(xdatavalid, ydatavalid);
+		Eigen::MatrixXd valid_pred = valid_res.pred;
+
+		double mse_valid = valid_res.mse;
 		valid_mse.push_back(mse_valid);
 
-		cout<< "------------- Finished training round " << i << " -------------" << endl;
-		cout <<"mse on training set is "<< mse << endl;
+		// record mse
+		train_mse_file << mse << " ";
+		valid_mse_file << mse_valid << " ";
+
+		if (i % 100 == 0) {
+			ofstream file;
+			// record validation data result
+			file.open("valid_result.txt", ios::app);
+			assert(file.is_open());
+			file << "step" << i << endl << valid_pred << endl;
+			file << "real value of validation sample:" << endl << ydatavalid << endl;
+			file.close();
+
+			// record weight and bias
+			for (auto layer : layers) {
+				weight_log[layer->getname()] = layer->getweights();
+				bias_log[layer->getname()] = layer->getbias();
+			}
+			file.open("model.txt", ofstream::trunc);
+			assert(file.is_open());
+			file << "step" << i << endl;
+			file << "weight: " << endl;
+			for (const auto &i : weight_log) {
+				file << i.first << ": " << i.second << endl;
+			}
+			file << "bias: " << endl;
+			for (const auto &i : bias_log) {
+				file << i.first << ": " << i.second << endl;
+			}
+			file.close();
+		}
+
+		cout << "------------- Finished training round " << i << " -------------" << endl;
+		cout << "mse on training set is " << mse << endl;
 		cout << "mse on validation set is " << mse_valid << endl;
 
 		cout << "Training set example:" << endl;
@@ -296,23 +341,55 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 		if (mse < accuracy)
 		{
 			cout << "Satisfy accuracy!" << endl;
-			return mse;
+			to_return = mse;
+			break;
 		}
 
 	}
+	mse_log["train"] = train_mse;
+	mse_log["valid"] = valid_mse;
 
-	return 0;
+	train_mse_file.close();
+	valid_mse_file.close();
+
+	// IO
+	result valid_res = Cal_loss(xdatavalid, ydatavalid);
+	Eigen::MatrixXd valid_pred = valid_res.pred;
+
+	ofstream file1("valid_result.txt", ofstream::app);
+	assert(file1.is_open());
+	file1 << "Final" << endl << valid_pred << endl;
+	file1 << "real value of validation sample:" << endl << ydatavalid << endl;
+	file1.close();
+
+	ofstream file2("model.txt", ofstream::trunc);
+	assert(file2.is_open());
+	file2 << "weight: " << endl;
+	for (const auto &i : weight_log) {
+		file2 << i.first << ": " << i.second << endl;
+	}
+	file2 << "bias: " << endl;
+	for (const auto &i : bias_log) {
+		file2 << i.first << ": " << i.second << endl;
+	}
+	file2.close();
+
+	return to_return;
 }
 
-double BPNN::Cal_loss(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata)
+result BPNN::Cal_loss(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata)
 {
 	double all_loss = 0;
 	Eigen::MatrixXd _xdata(1, xdata.cols());
+	Eigen::MatrixXd pred(xdata.rows(), ydata.cols());
+
 	for (int j = 0; j < xdata.rows(); j++)
 	{
-		all_loss += (Predict(xdata.row(j), ydata.cols()) - ydata.row(j)).unaryExpr([](double x) { return x*x; }).sum();
+		_xdata = Predict(xdata.row(j), ydata.cols());
+		all_loss += (_xdata - ydata.row(j)).unaryExpr([](double x) { return x * x; }).sum();
+		pred.row(j) = _xdata;
 	}
-	return all_loss / xdata.rows();
+	return result{ all_loss / xdata.rows(), pred };
 }
 
 void BPNN::Compare(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, int num)
@@ -321,7 +398,7 @@ void BPNN::Compare(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 	{
 		cout << "Predict value of sample " << k << " is " << Predict(xdata.row(k), ydata.cols()) << ". ";
 		cout << "Real value is " << ydata.row(k) << ". ";
-		cout << "Difference is " << Predict(xdata.row(k), ydata.cols()) - ydata.row(k) << ". "<<endl;
+		cout << "Difference is " << Predict(xdata.row(k), ydata.cols()) - ydata.row(k) << ". " << endl;
 	}
 }
 
@@ -388,7 +465,7 @@ Eigen::MatrixXd BPNN::Predict(const Eigen::MatrixXd& xdata, int output_len)
 void readdata(string filename, Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata)
 {
 	ifstream infile;
-	infile.open(filename); 
+	infile.open(filename);
 	assert(infile.is_open());
 
 	string date;
@@ -400,7 +477,7 @@ void readdata(string filename, Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata)
 		for (int j = 0; j < stock_cols; j++)
 		{
 			infile >> data;
-			xdata(i,j)= data;
+			xdata(i, j) = data;
 		}
 		infile >> data;
 		//cout << data << endl;
@@ -409,7 +486,7 @@ void readdata(string filename, Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata)
 
 	infile.close();
 
-	cout << "Successfully read the data from " +filename+"!" << endl;
+	cout << "Successfully read the data from " + filename + "!" << endl;
 }
 
 //main problem
@@ -444,18 +521,23 @@ void real_train()
 	Eigen::MatrixXd xdata_reduce(stock_rows, stock_cols_use);
 	xdata_reduce = xdata.block(0, 0, xdata.rows(), stock_cols_use);
 
-	double learning_rate = 0.0003;
+	double learning_rate = 0.003;
 	DenseLayer::Activation act_fun = DenseLayer::ReLu;
 	BPNN modelnew;
 
-	modelnew.AddLayer(stock_cols_use, stock_cols_use, learning_rate, true, act_fun);
-	modelnew.AddLayer(stock_cols_use, 50, learning_rate, false, act_fun);
-	modelnew.AddLayer(50, 5, learning_rate, false, act_fun);
-	modelnew.AddLayer(5, 1, learning_rate, false, DenseLayer::None);
+
+	modelnew.AddLayer(stock_cols_use, stock_cols_use, "input", learning_rate, true, act_fun);
+	modelnew.AddLayer(stock_cols_use, 50, "layer1", learning_rate, false, act_fun);
+	modelnew.AddLayer(50, 5, "layer2", learning_rate, false, act_fun);
+	modelnew.AddLayer(5, 1, "output", learning_rate, false, DenseLayer::None);	// output layer
 	modelnew.BuildLayer();
 	modelnew.Summary();
 
-	modelnew.Train(xdata_reduce, ydata, 10000, 1e-5, 30);
+
+
+	modelnew.Train(xdata_reduce, ydata, 300, 0.25, 30); // xdata, ydata, train_round
+
+
 }
 
 int main()
