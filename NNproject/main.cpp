@@ -88,7 +88,7 @@ void DenseLayer::Initializer()
 
 	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 	std::default_random_engine gen;
-	std::normal_distribution<double> dis(0, 1);
+	std::normal_distribution<double> dis(0, 0.1);
 	for (int i = 0; i < backunits_len; i++)
 		for (int j = 0; j < units_len; j++)
 			weight(i, j) = dis(gen);
@@ -111,7 +111,7 @@ Eigen::MatrixXd DenseLayer::ForwardPropagation(const Eigen::MatrixXd &_x_data)
 		if (act_func == Activation::Sigmoid)
 			output = wx_plus_b.unaryExpr([](double x) { return sigmoid(x); });
 		else if (act_func == Activation::ReLu)
-			output = wx_plus_b.unaryExpr([](double x) { return relu(x); });
+			output = wx_plus_b.unaryExpr([](double x) { return relu(x); });//relu(x)>6?6:relu(x)
 		else if (act_func == Activation::None)
 			output = wx_plus_b;
 		return output;
@@ -444,8 +444,8 @@ void real_train()
 	Eigen::MatrixXd xdata_reduce(stock_rows, stock_cols_use);
 	xdata_reduce = xdata.block(0, 0, xdata.rows(), stock_cols_use);
 
-	double learning_rate = 0.003;
-	DenseLayer::Activation act_fun = DenseLayer::Sigmoid;
+	double learning_rate = 0.0003;
+	DenseLayer::Activation act_fun = DenseLayer::ReLu;
 	BPNN modelnew;
 
 	modelnew.AddLayer(stock_cols_use, stock_cols_use, learning_rate, true, act_fun);
@@ -455,7 +455,7 @@ void real_train()
 	modelnew.BuildLayer();
 	modelnew.Summary();
 
-	modelnew.Train(xdata_reduce, ydata, 100000, 1e-10, 30);
+	modelnew.Train(xdata_reduce, ydata, 10000, 1e-5, 30);
 }
 
 int main()
