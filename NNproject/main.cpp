@@ -8,6 +8,7 @@
 
 #define stock_rows 465
 #define stock_cols 487
+#define stock_cols_use 300
 
 using namespace std;
 
@@ -417,18 +418,21 @@ void real_train()
 	Eigen::MatrixXd ydata(stock_rows, 1);
 	readdata("SPXdatanormshuffle.txt", xdata, ydata);
 
+	Eigen::MatrixXd xdata_reduce(stock_rows, stock_cols_use);
+	xdata_reduce = xdata.block(0, 0, xdata.rows(), stock_cols_use);
+
 	double learning_rate = 0.003;
 	DenseLayer::Activation act_fun = DenseLayer::Sigmoid;
 	BPNN modelnew;
 
-	modelnew.AddLayer(stock_cols, stock_cols, learning_rate, true, act_fun);
-	modelnew.AddLayer(stock_cols, 50, learning_rate, false, act_fun);
+	modelnew.AddLayer(stock_cols_use, stock_cols_use, learning_rate, true, act_fun);
+	modelnew.AddLayer(stock_cols_use, 50, learning_rate, false, act_fun);
 	modelnew.AddLayer(50, 5, learning_rate, false, act_fun);
 	modelnew.AddLayer(5, 1, learning_rate, false, DenseLayer::None);
 	modelnew.BuildLayer();
 	modelnew.Summary();
 
-	modelnew.Train(xdata, ydata, 100000, 1e-10, 30);
+	modelnew.Train(xdata_reduce, ydata, 100000, 1e-10, 30);
 }
 
 int main()
