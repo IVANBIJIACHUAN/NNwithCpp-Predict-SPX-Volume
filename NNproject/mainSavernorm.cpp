@@ -1,5 +1,5 @@
 #include <iostream>
-#include <Eigen/Dense>
+#include "Eigen/Dense"
 #include <vector>
 #include <string>
 #include <fstream>
@@ -39,6 +39,20 @@ double sigmoid(double x)
 double Dsigmoid(double x)
 {
 	return sigmoid(x)*(1 - sigmoid(x));
+}
+double Dnone(double x)
+{
+	return 1;
+}
+
+double x_square_by_4(double x)
+{
+	return x * x / 4.0;
+}
+
+double x_square(double x)
+{
+	return x * x;
 }
 
 void del_rec(string file)
@@ -124,9 +138,9 @@ Eigen::MatrixXd DenseLayer::ForwardPropagation(const Eigen::MatrixXd &_x_data)
 	{
 		wx_plus_b = x_data * weight - bias;
 		if (act_func == Activation::Sigmoid)
-			output = wx_plus_b.unaryExpr([](double x) { return sigmoid(x); });
+			output = wx_plus_b.unaryExpr(std::ref(sigmoid));
 		else if (act_func == Activation::ReLu)
-			output = wx_plus_b.unaryExpr([](double x) { return relu(x); });
+			output = wx_plus_b.unaryExpr(std::ref(relu));
 		else if (act_func == Activation::None)
 			output = wx_plus_b;
 		return output;
@@ -139,11 +153,11 @@ Eigen::MatrixXd DenseLayer::cal_gradient()
 	// Calculate a diagnal matrix to represent 1{wx_plus_b[i]>=0}, return a  units_len * units_len matrix.
 	Eigen::Matrix<double, 1, Eigen::Dynamic> D;
 	if (act_func == Activation::Sigmoid)
-		D = wx_plus_b.unaryExpr([](double x) { return Dsigmoid(x); });
+		D = wx_plus_b.unaryExpr(std::ref(Dsigmoid));
 	else if (act_func == Activation::ReLu)
-		D = wx_plus_b.unaryExpr([](double x) { return Drelu(x); });
+		D = wx_plus_b.unaryExpr(std::ref(Drelu));
 	else if (act_func == Activation::None)
-		D = wx_plus_b.unaryExpr([](double x) { return 1; });
+		D = wx_plus_b.unaryExpr(std::ref(Dnone));
 	return D.asDiagonal();
 
 }
@@ -177,12 +191,12 @@ public:
 	void BuildLayer();
 	void Summary();
 	double Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, int _train_round, double _accuracy, int validnum);
+	// Normalize
 	Eigen::MatrixXd Predict(const Eigen::MatrixXd& xdata, int output_len);
-	void Compare(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, int num);
+	Eigen::MatrixXd Pred_real(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, const Eigen::VectorXd& y_mean, const Eigen::VectorXd& y_std, int k);
+	void Compare(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, const Eigen::VectorXd& y_mean, const Eigen::VectorXd& y_std, int num);
+	result Cal_loss_real(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, const Eigen::VectorXd& y_mean, const Eigen::VectorXd& y_std);
 	result Cal_loss(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata);
-	// Add scalor
-
-
 private:
 	vector<DenseLayer*> layers;
 	vector<double> train_mse;
@@ -239,7 +253,7 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 	accuracy = _accuracy;
 	map<string, Eigen::MatrixXd> weight_log;
 	map<string, Eigen::MatrixXd> bias_log;
-	map<string, vector<double>> mse_log;
+	map<string, vector<double> > mse_log;
 	double to_return = 0;
 
 	int n = xdata.rows();
@@ -253,17 +267,34 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 		cout << "Bad input data!" << endl;
 		return 0;
 	}
+	// Normalize 
 
-	Eigen::MatrixXd xdatatrain = xdata.block(0, 0, xdata.rows() - validnum, xdata.cols());
-	Eigen::MatrixXd ydatatrain = ydata.block(0, 0, ydata.rows() - validnum, ydata.cols());
-	Eigen::MatrixXd xdatavalid = xdata.block(xdata.rows() - validnum, 0, validnum, xdata.cols());
-	Eigen::MatrixXd ydatavalid = ydata.block(ydata.rows() - validnum, 0, validnum, ydata.cols());
+	Eigen::MatrixXd xdatatrainraw = xdata.block(0, 0, xdata.rows() - validnum, xdata.cols());
+	Eigen::MatrixXd ydatatrainraw = ydata.block(0, 0, ydata.rows() - validnum, ydata.cols());
+	Eigen::MatrixXd xdatavalidraw = xdata.block(xdata.rows() - validnum, 0, validnum, xdata.cols());
+	Eigen::MatrixXd ydatavalidraw = ydata.block(ydata.rows() - validnum, 0, validnum, ydata.cols());
+
+	Eigen::VectorXd x_col_mean = xdatatrainraw.colwise().mean();
+	Eigen::MatrixXd x_dev = xdatatrainraw.rowwise() - x_col_mean.transpose();
+	Eigen::VectorXd x_std_dev = (x_dev.array().square().colwise().sum() / (xdatatrainraw.rows() - 1)).sqrt();
+	Eigen::MatrixXd xdatatrain = x_dev.array().rowwise() / x_std_dev.transpose().array();
+
+	Eigen::VectorXd y_col_mean = ydatatrainraw.colwise().mean();
+	Eigen::MatrixXd y_dev = ydatatrainraw.rowwise() - y_col_mean.transpose();
+	Eigen::VectorXd y_std_dev = (y_dev.array().square().colwise().sum() / (ydatatrainraw.rows() - 1)).sqrt();
+	Eigen::MatrixXd ydatatrain = y_dev.array().rowwise() / y_std_dev.transpose().array();
+
+	Eigen::MatrixXd xdatavalid_dev = (xdatavalidraw.rowwise() - x_col_mean.transpose());
+	Eigen::MatrixXd xdatavalid = xdatavalid_dev.array().rowwise() / x_std_dev.transpose().array();
+
+	Eigen::MatrixXd ydatavalid_dev = (ydatavalidraw.rowwise() - y_col_mean.transpose());
+	Eigen::MatrixXd ydatavalid = ydatavalid_dev.array().rowwise() / y_std_dev.transpose().array();
 
 	cout << "Initial mse on training set is " << Cal_loss(xdatatrain, ydatatrain).mse << endl;
-	Compare(xdatatrain, ydatatrain, 3);
+	Compare(xdatatrain, ydatatrainraw, y_col_mean, y_std_dev, 3);
 
 	cout << "Initial mse on validation set is " << Cal_loss(xdatavalid, ydatavalid).mse << endl;
-	Compare(xdatavalid, ydatavalid, 3);
+	Compare(xdatavalid, ydatavalidraw, y_col_mean, y_std_dev, 3);
 
 	del_rec("train_mse.txt");
 	del_rec("valid_mse.txt");
@@ -287,7 +318,7 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 			}
 
 			loss_gradient = 2.0 * (_xdata - _ydata);
-			loss = loss_gradient.unaryExpr([](double x) { return x * x / 4.0; }).sum();
+			loss = loss_gradient.unaryExpr(std::ref(x_square_by_4)).sum();
 
 			all_loss += loss;
 
@@ -301,10 +332,10 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 		double mse = all_loss / xdatatrain.rows();
 		train_mse.push_back(mse);
 
-		result valid_res = Cal_loss(xdatavalid, ydatavalid);
+		result valid_res = Cal_loss_real(xdatavalid, ydatavalid, y_col_mean, y_std_dev);
 		Eigen::MatrixXd valid_pred = valid_res.pred;
 
-		double mse_valid = valid_res.mse;
+		double mse_valid = Cal_loss(xdatavalid, ydatavalid).mse;
 		valid_mse.push_back(mse_valid);
 
 		// record mse
@@ -344,10 +375,10 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 		cout << "mse on validation set is " << mse_valid << endl;
 
 		cout << "Training set example:" << endl;
-		Compare(xdatatrain, ydatatrain, 3);
+		Compare(xdatatrain, ydatatrainraw, y_col_mean, y_std_dev, 3);
 
 		cout << "Validation set example:" << endl;
-		Compare(xdatavalid, ydatavalid, 3);
+		Compare(xdatavalid, ydatavalidraw, y_col_mean, y_std_dev, 3);
 
 		if (mse < accuracy)
 		{
@@ -364,7 +395,7 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 	valid_mse_file.close();
 
 	// IO
-	result valid_res = Cal_loss(xdatavalid, ydatavalid);
+	result valid_res = Cal_loss_real(xdatavalid, ydatavalid, y_col_mean, y_std_dev);
 	Eigen::MatrixXd valid_pred = valid_res.pred;
 
 	ofstream file1("valid_result.txt", ofstream::app);
@@ -388,6 +419,21 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 	return to_return;
 }
 
+result BPNN::Cal_loss_real(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, const Eigen::VectorXd& y_mean, const Eigen::VectorXd& y_std)
+{
+	double all_loss = 0;
+	Eigen::MatrixXd _xdata(1, xdata.cols());
+	Eigen::MatrixXd pred(xdata.rows(), ydata.cols());
+
+	for (int j = 0; j < xdata.rows(); j++)
+	{
+		_xdata = Pred_real(xdata, ydata, y_mean, y_std, j);
+		all_loss += (_xdata - ydata.row(j)).unaryExpr(std::ref(x_square)).sum();
+		pred.row(j) = _xdata;
+	}
+	return result{ all_loss / xdata.rows(), pred };
+}
+
 result BPNN::Cal_loss(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata)
 {
 	double all_loss = 0;
@@ -403,15 +449,27 @@ result BPNN::Cal_loss(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata
 	return result{ all_loss / xdata.rows(), pred };
 }
 
-void BPNN::Compare(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, int num)
+// Normalize
+Eigen::MatrixXd BPNN::Pred_real(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, const Eigen::VectorXd& y_mean, const Eigen::VectorXd& y_std, int k) {
+
+	Eigen::MatrixXd pred = (Predict(xdata.row(k), ydata.cols())).array().rowwise() * y_std.transpose().array();
+	pred = pred.rowwise() + y_mean.transpose();
+	return pred;
+}
+
+void BPNN::Compare(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, const Eigen::VectorXd& y_mean, const Eigen::VectorXd& y_std, int num)
 {
 	for (int k = 0; k < num; k++)
 	{
-		cout << "Predict value of sample " << k << " is " << Predict(xdata.row(k), ydata.cols()) << ". ";
+		Eigen::MatrixXd pred = Pred_real(xdata, ydata, y_mean, y_std, k);
+
+		cout << "Predict value of sample " << k << " is " << pred << ". ";
 		cout << "Real value is " << ydata.row(k) << ". ";
-		cout << "Difference is " << Predict(xdata.row(k), ydata.cols()) - ydata.row(k) << ". " << endl;
+		cout << "Difference is " << pred - ydata.row(k) << ". " << endl;
 	}
 }
+
+// Normalize end
 
 Eigen::MatrixXd BPNN::Predict(const Eigen::MatrixXd& xdata, int output_len)
 {
@@ -477,14 +535,12 @@ void readdata(string filename, Eigen::MatrixXd& xdata, Eigen::MatrixXd& ydata)
 {
 	ifstream infile;
 	infile.open(filename);
-	assert(infile.is_open());
+	//assert(infile.is_open());
 
 	string date;
 	double data;
 	for (int i = 0; i < stock_rows; i++)
 	{
-		//infile >> date;
-		//cout << date << endl;
 		for (int j = 0; j < stock_cols; j++)
 		{
 			infile >> data;
@@ -527,7 +583,7 @@ void real_train()
 {
 	Eigen::MatrixXd xdata(stock_rows, stock_cols);
 	Eigen::MatrixXd ydata(stock_rows, 1);
-	readdata("SPXdatanormshuffle.txt", xdata, ydata);
+	readdata("SPXshuffle.txt", xdata, ydata);
 
 	Eigen::MatrixXd xdata_reduce(stock_rows, stock_cols_use);
 	xdata_reduce = xdata.block(0, 0, xdata.rows(), stock_cols_use);
