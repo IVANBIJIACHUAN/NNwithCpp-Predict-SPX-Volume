@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="mainSaver.cpp">
+    <ClCompile Include="mainSaver_CGD.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
