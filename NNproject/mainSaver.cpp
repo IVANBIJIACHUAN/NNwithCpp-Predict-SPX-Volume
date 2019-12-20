@@ -96,7 +96,7 @@ void DenseLayer::Initializer()
 
 	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 	std::default_random_engine gen;
-	std::normal_distribution<double> dis(0, 1);
+	std::normal_distribution<double> dis(0, 0.1);
 	for (int i = 0; i < backunits_len; i++)
 		for (int j = 0; j < units_len; j++)
 			weight(i, j) = dis(gen);
@@ -257,6 +257,14 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 
 	cout << "Initial mse on validation set is " << Cal_loss(xdatavalid, ydatavalid).mse << endl;
 	Compare(xdatavalid, ydatavalid, 3);
+
+	ofstream train_mse_file_del, valid_mse_file_del,file_del;
+	train_mse_file_del.open("train_mse.txt", ios::trunc);
+	valid_mse_file_del.open("valid_mse.txt", ios::trunc);
+	file_del.open("valid_result.txt", ios::trunc);
+	train_mse_file_del.close();
+	valid_mse_file_del.close();
+	file_del.close();
 
 	ofstream train_mse_file, valid_mse_file;
 	train_mse_file.open("train_mse.txt", ios::app);
@@ -521,7 +529,7 @@ void real_train()
 	Eigen::MatrixXd xdata_reduce(stock_rows, stock_cols_use);
 	xdata_reduce = xdata.block(0, 0, xdata.rows(), stock_cols_use);
 
-	double learning_rate = 0.003;
+	double learning_rate = 0.0003;
 	DenseLayer::Activation act_fun = DenseLayer::ReLu;
 	BPNN modelnew;
 
@@ -532,10 +540,10 @@ void real_train()
 	modelnew.AddLayer(5, 1, "output", learning_rate, false, DenseLayer::None);	// output layer
 	modelnew.BuildLayer();
 	modelnew.Summary();
+	
 
 
-
-	modelnew.Train(xdata_reduce, ydata, 300, 0.25, 30); // xdata, ydata, train_round
+	modelnew.Train(xdata_reduce, ydata, 250,0.25, 30); // xdata, ydata, train_round
 
 
 }
