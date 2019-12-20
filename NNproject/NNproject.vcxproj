@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="mainSaver.cpp" />
+    <ClCompile Include="mainSaver_CGD.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9FA7CF48-678E-4FA4-939A-54FA59F385A8}</ProjectGuid>

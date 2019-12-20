@@ -10,7 +10,7 @@
 
 #define stock_rows 465
 #define stock_cols 487
-#define stock_cols_use 487
+#define stock_cols_use 300
 
 using namespace std;
 
@@ -39,6 +39,13 @@ double sigmoid(double x)
 double Dsigmoid(double x)
 {
 	return sigmoid(x)*(1 - sigmoid(x));
+}
+
+void del_rec(string file)
+{
+	ofstream file_del;
+	file_del.open(file, ios::trunc);
+	file_del.close();
 }
 
 class DenseLayer
@@ -96,7 +103,7 @@ void DenseLayer::Initializer()
 
 	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 	std::default_random_engine gen;
-	std::normal_distribution<double> dis(0, 1);
+	std::normal_distribution<double> dis(0, 0.1);
 	for (int i = 0; i < backunits_len; i++)
 		for (int j = 0; j < units_len; j++)
 			weight(i, j) = dis(gen);
@@ -258,11 +265,15 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 	cout << "Initial mse on validation set is " << Cal_loss(xdatavalid, ydatavalid).mse << endl;
 	Compare(xdatavalid, ydatavalid, 3);
 
+	del_rec("train_mse.txt");
+	del_rec("valid_mse.txt");
+	del_rec("valid_result.txt");
+
 	ofstream train_mse_file, valid_mse_file;
 	train_mse_file.open("train_mse.txt", ios::app);
 	valid_mse_file.open("valid_mse.txt", ios::app);
 
-	for (int i=0; i < train_round; i++)
+	for (int i = 0; i < train_round; i++)
 	{
 		all_loss = 0;
 		for (int j = 0; j < xdatatrain.rows(); j++)
@@ -521,7 +532,7 @@ void real_train()
 	Eigen::MatrixXd xdata_reduce(stock_rows, stock_cols_use);
 	xdata_reduce = xdata.block(0, 0, xdata.rows(), stock_cols_use);
 
-	double learning_rate = 0.003;
+	double learning_rate = 0.0003;
 	DenseLayer::Activation act_fun = DenseLayer::ReLu;
 	BPNN modelnew;
 
@@ -535,7 +546,7 @@ void real_train()
 
 
 
-	modelnew.Train(xdata_reduce, ydata, 300, 0.25, 30); // xdata, ydata, train_round
+	modelnew.Train(xdata_reduce, ydata, 250, 0.25, 30); // xdata, ydata, train_round
 
 
 }
