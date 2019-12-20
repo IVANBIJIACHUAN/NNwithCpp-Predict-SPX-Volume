@@ -10,7 +10,7 @@
 
 #define stock_rows 465
 #define stock_cols 487
-#define stock_cols_use 487
+#define stock_cols_use 300
 
 using namespace std;
 
@@ -39,6 +39,13 @@ double sigmoid(double x)
 double Dsigmoid(double x)
 {
 	return sigmoid(x)*(1 - sigmoid(x));
+}
+
+void del_rec(string file)
+{
+	ofstream file_del;
+	file_del.open(file, ios::trunc);
+	file_del.close();
 }
 
 class DenseLayer
@@ -258,13 +265,9 @@ double BPNN::Train(const Eigen::MatrixXd& xdata, const Eigen::MatrixXd& ydata, i
 	cout << "Initial mse on validation set is " << Cal_loss(xdatavalid, ydatavalid).mse << endl;
 	Compare(xdatavalid, ydatavalid, 3);
 
-	ofstream train_mse_file_del, valid_mse_file_del,file_del;
-	train_mse_file_del.open("train_mse.txt", ios::trunc);
-	valid_mse_file_del.open("valid_mse.txt", ios::trunc);
-	file_del.open("valid_result.txt", ios::trunc);
-	train_mse_file_del.close();
-	valid_mse_file_del.close();
-	file_del.close();
+	del_rec("train_mse.txt");
+	del_rec("valid_mse.txt");
+	del_rec("valid_result.txt");
 
 	ofstream train_mse_file, valid_mse_file;
 	train_mse_file.open("train_mse.txt", ios::app);
